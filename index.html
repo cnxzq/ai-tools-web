@@ -1,13 +1,82 @@
 <!doctype html>
-<html lang="en">
+<html lang="zh-CN">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ai-tools-web</title>
+    <meta
+      name="description"
+      content="ZQZYZ 在线工具箱收录可直接在浏览器中使用的 Web 静态应用，涵盖文件处理、AI API 测试、开发调试和数据处理等场景。"
+    />
+    <meta name="robots" content="index, follow" />
+    <meta name="theme-color" content="#0b1020" />
+    <link rel="canonical" href="https://tool.zqzyz.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="zh_CN" />
+    <meta property="og:site_name" content="ZQZYZ 在线工具箱" />
+    <meta property="og:title" content="ZQZYZ 在线工具箱｜文件处理、API 测试与 Web 实用应用" />
+    <meta
+      property="og:description"
+      content="集中收录文件处理、AI API 测试、开发调试和数据处理等 Web 静态应用。"
+    />
+    <meta property="og:url" content="https://tool.zqzyz.com/" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="ZQZYZ 在线工具箱" />
+    <meta
+      name="twitter:description"
+      content="可直接在浏览器中使用的 Web 静态应用集合。"
+    />
+
+    <title>ZQZYZ 在线工具箱｜文件处理、API 测试与 Web 实用应用</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://tool.zqzyz.com/#website",
+            "url": "https://tool.zqzyz.com/",
+            "name": "ZQZYZ 在线工具箱",
+            "description": "面向日常工作和开发调试的 Web 静态应用集合。",
+            "inLanguage": "zh-CN"
+          },
+          {
+            "@type": "CollectionPage",
+            "@id": "https://tool.zqzyz.com/#collection",
+            "url": "https://tool.zqzyz.com/",
+            "name": "ZQZYZ 在线工具箱",
+            "isPartOf": { "@id": "https://tool.zqzyz.com/#website" },
+            "about": [
+              { "@type": "Thing", "name": "文件处理" },
+              { "@type": "Thing", "name": "AI API 测试" },
+              { "@type": "Thing", "name": "开发调试" },
+              { "@type": "Thing", "name": "数据处理" }
+            ],
+            "inLanguage": "zh-CN"
+          }
+        ]
+      }
+    </script>
   </head>
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <main>
+        <h1>ZQZYZ 在线工具箱</h1>
+        <p>
+          一个持续整理的 Web 静态应用集合，覆盖文件处理、AI API 测试、开发调试与数据处理等场景。
+        </p>
+        <section aria-labelledby="static-categories-title">
+          <h2 id="static-categories-title">工具分类</h2>
+          <ul>
+            <li>文件处理</li>
+            <li>AI 与 API</li>
+            <li>开发调试</li>
+            <li>数据处理</li>
+          </ul>
+        </section>
+      </main>
+    </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
