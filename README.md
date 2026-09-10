@@ -21,4 +21,4 @@ pnpm dev
 https://tool.zqzyz.com/
 ```
 
-项目通过 `public/CNAME` 绑定自定义域名，并使用根路径 `/` 构建静态资源。
+GitHub Pages 仓库设置绑定了该自定义域名，项目使用根路径 `/` 构建静态资源。
