@@ -15,10 +15,10 @@ pnpm dev
 
 首次发布前，需要在 GitHub 仓库的 **Settings → Pages → Build and deployment** 中将 **Source** 设置为 **GitHub Actions**。
 
-普通项目仓库的访问地址为：
+线上访问地址：
 
 ```text
-https://<GitHub 用户名或组织名>.github.io/<仓库名>/
+https://tool.zqzyz.com/
 ```
 
-工作流会根据 GitHub 仓库名自动设置 Vite 的 `base` 路径，本地开发仍使用 `/`。
+项目通过 `public/CNAME` 绑定自定义域名，并使用根路径 `/` 构建静态资源。
