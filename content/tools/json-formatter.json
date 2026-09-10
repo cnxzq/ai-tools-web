@@ -1,0 +1,10 @@
+{
+  "id": "json-formatter",
+  "title": "JSON 格式化",
+  "description": "格式化、压缩与校验 JSON，保留大整数和数字原文。",
+  "tags": ["JSON", "Web", "文本"],
+  "aliases": ["json", "格式化", "压缩", "校验", "pretty", "minify"],
+  "pinned": true,
+  "order": 5,
+  "component": "json-formatter"
+}

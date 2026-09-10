@@ -1,0 +1,57 @@
+[
+  {
+    "id": "mdn",
+    "title": "MDN Web 文档",
+    "description": "HTML、CSS、JavaScript 和 Web API 参考。",
+    "url": "https://developer.mozilla.org/zh-CN/",
+    "tags": ["Web", "JavaScript", "文档"],
+    "aliases": ["浏览器", "前端", "js", "css"],
+    "pinned": true,
+    "order": 10
+  },
+  {
+    "id": "git-docs",
+    "title": "Git 命令参考",
+    "description": "查命令参数、使用示例和 Git 操作语义。",
+    "url": "https://git-scm.com/docs",
+    "tags": ["Git", "文档"],
+    "aliases": ["版本管理", "提交", "分支"],
+    "order": 20
+  },
+  {
+    "id": "powershell-docs",
+    "title": "PowerShell 文档",
+    "description": "PowerShell 语法、命令与跨平台使用说明。",
+    "url": "https://learn.microsoft.com/zh-cn/powershell/",
+    "tags": ["Windows", "PowerShell", "文档"],
+    "aliases": ["pwsh", "终端", "脚本"],
+    "order": 30
+  },
+  {
+    "id": "docker-docs",
+    "title": "Docker 文档",
+    "description": "容器、镜像、Compose 与 Docker CLI 参考。",
+    "url": "https://docs.docker.com/",
+    "tags": ["Docker", "Linux", "文档"],
+    "aliases": ["容器", "镜像", "compose"],
+    "order": 40
+  },
+  {
+    "id": "github-docs",
+    "title": "GitHub 文档",
+    "description": "仓库管理、Actions 工作流和 Pages 部署说明。",
+    "url": "https://docs.github.com/zh",
+    "tags": ["GitHub", "文档"],
+    "aliases": ["actions", "pages", "部署"],
+    "order": 50
+  },
+  {
+    "id": "vue-docs",
+    "title": "Vue 中文文档",
+    "description": "Vue 3 指南、组件开发和 API 参考。",
+    "url": "https://cn.vuejs.org/",
+    "tags": ["Vue", "Web", "文档"],
+    "aliases": ["vue3", "组件", "前端"],
+    "order": 60
+  }
+]

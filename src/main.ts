@@ -1,6 +1,6 @@
 import { createApp } from 'vue'
-import './style.css'
+import './base'
 import App from './App.vue'
-import 'virtual:uno.css'
+import { entries, site } from 'virtual:content'
 
-createApp(App).mount('#app')
+createApp(App, { entries, site }).mount('#app')

@@ -1,18 +1,31 @@
-import { defineConfig } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { defineConfig, type UserConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 import UnoCSS from 'unocss/vite'
-import { fileURLToPath, URL } from 'node:url'
+import { loadContent } from './build/content.ts'
+import { siteDocuments, writeSite } from './build/site.ts'
+import { contentPlugin } from './build/plugin.ts'
 
-// https://vite.dev/config/
-export default defineConfig({
-  base: '/',
-  plugins: [vue(), UnoCSS(fileURLToPath(new URL('./uno.config.ts', import.meta.url)))],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
+const root = fileURLToPath(new URL('.', import.meta.url))
+
+export default defineConfig(async (): Promise<UserConfig> => {
+  const snapshot = await loadContent(root)
+  const input = await writeSite(root, siteDocuments(snapshot))
+  return {
+    root: path.join(root, '.generated'),
+    base: '/',
+    appType: 'mpa',
+    publicDir: path.join(root, 'public'),
+    plugins: [contentPlugin(root, snapshot), vue(), UnoCSS(path.join(root, 'uno.config.ts'))],
+    resolve: {
+      alias: { '@': path.join(root, 'src'), '/src': path.join(root, 'src') },
     },
-  },
-  build:{
-    emptyOutDir:true
+    server: { fs: { allow: [root] } },
+    build: {
+      outDir: path.join(root, 'dist'),
+      emptyOutDir: true,
+      rolldownOptions: { input },
+    },
   }
 })

@@ -1,215 +1,243 @@
 <script setup lang="ts">
-import { toolCategories, tools, type ToolCategoryId } from './data/catalog'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import type { ContentEntry, EntryType, SiteConfig } from './content-types'
+import { filterEntries, type EntryFilterType } from './lib/search'
 
-const repositoryUrl = 'https://github.com/cnxzq/ai-tools-web'
-const publishedTools = tools.filter((tool) => tool.status === 'available')
-
-function toolsForCategory(categoryId: ToolCategoryId) {
-  return tools.filter((tool) => tool.categoryId === categoryId)
+const props = defineProps<{ entries: ContentEntry[]; site: SiteConfig }>()
+const typeLabels: Record<EntryType, string> = {
+  command: '命令', bookmark: '网址', tool: '工具', note: '笔记',
 }
+const typeSymbols: Record<EntryType, string> = {
+  command: '>_', bookmark: '↗', tool: '{ }', note: '≡',
+}
+const tabs: { type: EntryFilterType; label: string }[] = [
+  { type: 'all', label: '全部' },
+  { type: 'command', label: '命令' },
+  { type: 'bookmark', label: '网址' },
+  { type: 'tool', label: '工具' },
+  { type: 'note', label: '笔记' },
+]
+const query = ref('')
+const type = ref<EntryFilterType>('all')
+const tag = ref('')
+const searchInput = ref<HTMLInputElement>()
+const copyStatus = ref<Record<string, string>>({})
+const copyTimers = new Map<string, ReturnType<typeof setTimeout>>()
+const copying = new Set<string>()
+
+const tags = computed(() => {
+  const counts = new Map<string, number>()
+  for (const entry of props.entries) {
+    for (const value of new Set(entry.tags)) counts.set(value, (counts.get(value) ?? 0) + 1)
+  }
+  return [...counts].map(([name, count]) => ({ name, count }))
+    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name, 'zh-CN'))
+})
+const typeCounts = computed(() => {
+  const counts = { all: props.entries.length, command: 0, bookmark: 0, tool: 0, note: 0 }
+  for (const entry of props.entries) counts[entry.type]++
+  return counts
+})
+const results = computed(() => filterEntries(props.entries, {
+  query: query.value, type: type.value, tag: tag.value,
+}))
+const isFiltered = computed(() => Boolean(query.value.trim() || type.value !== 'all' || tag.value))
+const pinnedCount = computed(() => props.entries.filter((entry) => entry.pinned).length)
+const contentUrl = computed(() => `${props.site.repositoryUrl.replace(/\/$/, '')}/tree/main/content`)
+
+function readUrl() {
+  const params = new URLSearchParams(window.location.search)
+  query.value = params.get('query') ?? ''
+  const requestedType = params.get('type')
+  type.value = tabs.some((tab) => tab.type === requestedType) ? requestedType as EntryFilterType : 'all'
+  tag.value = params.get('tag') ?? ''
+}
+
+function writeUrl(mode: 'push' | 'replace') {
+  const url = new URL(window.location.href)
+  const filters: [string, string][] = [
+    ['query', query.value], ['type', type.value === 'all' ? '' : type.value], ['tag', tag.value],
+  ]
+  for (const [key, value] of filters) {
+    if (value) url.searchParams.set(key, value)
+    else url.searchParams.delete(key)
+  }
+  if (url.href !== window.location.href) window.history[mode === 'push' ? 'pushState' : 'replaceState'](null, '', url)
+}
+
+function search(event: Event) {
+  query.value = (event.target as HTMLInputElement).value
+  writeUrl('replace')
+}
+
+function selectType(value: EntryFilterType) {
+  type.value = value
+  writeUrl('push')
+}
+
+function selectTag(value: string) {
+  tag.value = tag.value === value ? '' : value
+  writeUrl('push')
+}
+
+function clearSearch() {
+  query.value = ''
+  writeUrl('replace')
+  searchInput.value?.focus()
+}
+
+function resetFilters() {
+  query.value = ''
+  type.value = 'all'
+  tag.value = ''
+  writeUrl('push')
+  searchInput.value?.focus()
+}
+
+function keyboardShortcut(event: KeyboardEvent) {
+  const target = event.target as HTMLElement | null
+  const editing = target?.matches('input, textarea, select') || target?.isContentEditable
+  if (event.key === '/' && !editing && !event.ctrlKey && !event.metaKey && !event.altKey) {
+    event.preventDefault()
+    searchInput.value?.focus()
+  } else if (event.key === 'Escape' && target === searchInput.value) {
+    if (query.value) clearSearch()
+    else searchInput.value?.blur()
+  }
+}
+
+async function copyCode(event: MouseEvent, entryId: string, index: number, code: string) {
+  const key = `${entryId}:${index}`
+  if (copying.has(key)) return
+  copying.add(key)
+  clearTimeout(copyTimers.get(key))
+  const codeElement = (event.currentTarget as HTMLElement).closest('.code-block')?.querySelector('code')
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error('Clipboard unavailable')
+    await navigator.clipboard.writeText(code)
+    copyStatus.value[key] = '已复制'
+  } catch {
+    if (codeElement) {
+      const range = document.createRange()
+      range.selectNodeContents(codeElement)
+      const selection = window.getSelection()
+      selection?.removeAllRanges()
+      selection?.addRange(range)
+    }
+    copyStatus.value[key] = '无法自动复制，已选中代码，请手动复制'
+  } finally {
+    copying.delete(key)
+    copyTimers.set(key, setTimeout(() => { delete copyStatus.value[key] }, 6000))
+  }
+}
+
+onMounted(() => {
+  readUrl()
+  window.addEventListener('popstate', readUrl)
+  window.addEventListener('keydown', keyboardShortcut)
+})
+onBeforeUnmount(() => {
+  window.removeEventListener('popstate', readUrl)
+  window.removeEventListener('keydown', keyboardShortcut)
+  for (const timer of copyTimers.values()) clearTimeout(timer)
+})
 </script>
 
 <template>
-  <a
-    href="#main-content"
-    class="fixed left-4 top-4 z-50 -translate-y-24 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-950 shadow-lg transition-transform focus:translate-y-0"
-  >
-    跳到主要内容
-  </a>
+  <a class="skip-link" href="#main-content">跳到主要内容</a>
+  <header class="site-header">
+    <a class="brand" href="/" :aria-label="`${site.title}首页`">
+      <span class="brand-mark" aria-hidden="true">z<span>.</span></span>
+      <span>{{ site.title }}<small>个人备忘 · 常用工具</small></span>
+    </a>
+    <nav class="header-actions" aria-label="站点导航">
+      <a :href="contentUrl" target="_blank" rel="noopener noreferrer" class="edit-content-link">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m16 3 5 5M4 15 16 3a2.1 2.1 0 0 1 3 0l2 2a2.1 2.1 0 0 1 0 3L9 20l-6 1 1-6Z"/></svg>
+        编辑内容
+      </a>
+      <a :href="site.repositoryUrl" target="_blank" rel="noopener noreferrer" class="github-link" aria-label="GitHub">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M9 19c-4 1-4-2-6-2m12 5v-4a3.5 3.5 0 0 0-1-3c3-.3 6-1.5 6-6a5 5 0 0 0-1.5-3.5A4.7 4.7 0 0 0 18.4 2S17 1.5 14.8 3a13 13 0 0 0-5.6 0C7 1.5 5.6 2 5.6 2a4.7 4.7 0 0 0-.1 3.5A5 5 0 0 0 4 9c0 4.5 3 5.7 6 6a3.5 3.5 0 0 0-1 3v4"/></svg>
+        <span>GitHub</span>
+      </a>
+    </nav>
+  </header>
 
-  <div class="min-h-screen overflow-hidden bg-[#080d1a] text-slate-200">
-    <div class="pointer-events-none fixed inset-0 opacity-80" aria-hidden="true">
-      <div class="absolute left-[-8rem] top-[-12rem] h-96 w-96 rounded-full bg-cyan-400/12 blur-3xl"></div>
-      <div class="absolute right-[-10rem] top-32 h-[30rem] w-[30rem] rounded-full bg-violet-500/12 blur-3xl"></div>
+  <main id="main-content" class="page-shell home-shell">
+    <div class="workspace-heading">
+      <div><p class="eyebrow">PERSONAL INDEX</p><h1>备忘与工具</h1></div>
+      <p class="workspace-description">{{ site.description }}</p>
     </div>
 
-    <header class="relative z-10 border-b border-white/8">
-      <div class="mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:px-8">
-        <a href="/" class="group flex items-center gap-3 text-white no-underline" aria-label="ZQZYZ 在线工具箱首页">
-          <span
-            class="grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-cyan-300 to-violet-500 text-sm font-black text-slate-950 shadow-lg shadow-cyan-500/15 transition-transform group-hover:-rotate-3 group-hover:scale-105"
-            aria-hidden="true"
-          >ZT</span>
-          <span>
-            <strong class="block text-sm tracking-[0.12em]">ZQZYZ TOOLS</strong>
-            <span class="block text-xs text-slate-500">Web 在线工具箱</span>
-          </span>
-        </a>
+    <form class="search-box" role="search" @submit.prevent>
+      <label class="visually-hidden" for="content-search">搜索命令、网址、工具和笔记</label>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 4.5 4.5"/></svg>
+      <input id="content-search" ref="searchInput" :value="query" type="search" placeholder="搜索命令、网址、工具和笔记…" autocomplete="off" @input="search" />
+      <button v-if="query" type="button" class="search-clear" aria-label="清空搜索" @click="clearSearch">×</button>
+      <kbd v-else aria-hidden="true">/</kbd>
+    </form>
 
-        <nav aria-label="主要导航" class="flex items-center gap-2 sm:gap-5">
-          <a href="#categories" class="hidden text-sm text-slate-400 no-underline transition-colors hover:text-white sm:block">工具分类</a>
-          <a href="#principles" class="hidden text-sm text-slate-400 no-underline transition-colors hover:text-white sm:block">收录原则</a>
-          <a
-            :href="repositoryUrl"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="rounded-full border border-white/12 bg-white/5 px-4 py-2 text-sm font-medium text-slate-200 no-underline transition-colors hover:border-cyan-300/40 hover:bg-cyan-300/8 hover:text-white"
-          >
-            GitHub
-          </a>
-        </nav>
-      </div>
-    </header>
+    <div class="type-tabs" role="group" aria-label="按内容类型筛选">
+      <button v-for="tab in tabs" :key="tab.type" type="button" :class="['type-tab', { active: type === tab.type }]" :aria-pressed="type === tab.type" @click="selectType(tab.type)">
+        {{ tab.label }}<span>{{ typeCounts[tab.type] }}</span>
+      </button>
+    </div>
 
-    <main id="main-content" class="relative z-10">
-      <section class="mx-auto max-w-6xl px-5 pb-20 pt-20 sm:px-8 sm:pb-28 sm:pt-28">
-        <div class="max-w-4xl">
-          <p class="mb-6 flex items-center gap-3 text-xs font-semibold uppercase tracking-[0.24em] text-cyan-300">
-            <span class="h-px w-8 bg-cyan-300/70" aria-hidden="true"></span>
-            Web utilities · 持续整理
-          </p>
-          <h1 class="m-0 text-balance text-5xl font-black leading-[1.08] tracking-[-0.045em] text-white sm:text-7xl lg:text-[5.5rem]">
-            把常用操作，<br />放回浏览器里完成
-          </h1>
-          <p class="mt-8 max-w-2xl text-lg leading-8 text-slate-400 sm:text-xl">
-            ZQZYZ 在线工具箱是一个 Web 静态应用集合，面向文件处理、AI API 测试、开发调试与数据处理等日常场景。
-          </p>
-
-          <div class="mt-10 flex flex-wrap items-center gap-3">
-            <a
-              href="#categories"
-              class="rounded-full bg-cyan-300 px-6 py-3 text-sm font-bold text-slate-950 no-underline transition hover:bg-cyan-200 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-cyan-300"
-            >
-              浏览工具分类
-            </a>
-            <span class="rounded-full border border-white/10 px-5 py-3 text-sm text-slate-400">
-              {{ publishedTools.length > 0 ? `已上线 ${publishedTools.length} 个工具` : '首批工具整理中' }}
-            </span>
-          </div>
+    <div class="workspace-grid">
+      <aside class="tag-sidebar" aria-label="标签筛选">
+        <div class="sidebar-heading"><h2>标签</h2><span>{{ tags.length }}</span></div>
+        <div class="tag-filters">
+          <button type="button" :class="['tag-filter', { active: !tag }]" :aria-pressed="!tag" @click="selectTag('')"><span>全部标签</span><span>{{ entries.length }}</span></button>
+          <button v-for="item in tags" :key="item.name" type="button" :class="['tag-filter', { active: tag === item.name }]" :aria-pressed="tag === item.name" @click="selectTag(item.name)"><span><i aria-hidden="true">#</i>{{ item.name }}</span><span>{{ item.count }}</span></button>
         </div>
+        <div class="sidebar-note"><span class="small-pin" aria-hidden="true">◆</span><p>{{ pinnedCount }} 条常用记录<br /><span>常用在前，随手可取。</span></p></div>
+        <p class="keyboard-hint"><kbd>/</kbd> 搜索 <span>·</span> <kbd>Esc</kbd> 清空</p>
+      </aside>
 
-        <div class="mt-18 grid gap-3 border-t border-white/8 pt-7 text-sm text-slate-500 sm:grid-cols-3">
-          <p class="m-0"><span class="mr-2 text-cyan-300">01</span>静态部署，直接访问</p>
-          <p class="m-0"><span class="mr-2 text-cyan-300">02</span>按使用场景分类</p>
-          <p class="m-0"><span class="mr-2 text-cyan-300">03</span>独立应用，持续增加</p>
+      <section class="results-panel" aria-labelledby="results-heading">
+        <div class="results-toolbar">
+          <h2 id="results-heading">{{ isFiltered ? '筛选结果' : '所有记录' }}<span aria-live="polite">{{ results.length }} 条</span></h2>
+          <button v-if="isFiltered" type="button" class="text-button" @click="resetFilters">清空筛选</button>
+          <span v-else class="sort-hint">常用优先</span>
         </div>
-      </section>
+        <div v-if="tag" class="active-filter">标签：<button type="button" @click="selectTag(tag)">{{ tag }} <span aria-hidden="true">×</span><span class="visually-hidden">，取消筛选</span></button></div>
 
-      <section id="categories" class="border-y border-white/8 bg-white/[0.018] scroll-mt-20">
-        <div class="mx-auto max-w-6xl px-5 py-20 sm:px-8 sm:py-24">
-          <div class="mb-12 flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
-            <div>
-              <p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-violet-300">Catalog</p>
-              <h2 class="m-0 text-3xl font-bold tracking-tight text-white sm:text-4xl">按场景找到合适的工具</h2>
+        <div v-if="results.length" class="entry-list">
+          <article v-for="entry in results" :key="entry.id" :class="['entry-card', `entry-${entry.type}`]">
+            <div class="entry-row">
+              <span :class="['entry-icon', `icon-${entry.type}`]" aria-hidden="true">{{ typeSymbols[entry.type] }}</span>
+              <div class="entry-main">
+                <div class="entry-title-line">
+                  <h3><a :href="entry.href" :target="entry.type === 'bookmark' ? '_blank' : undefined" :rel="entry.type === 'bookmark' ? 'noopener noreferrer' : undefined">{{ entry.title }}<span v-if="entry.type === 'bookmark'" class="external-arrow" aria-label="在新标签页打开">↗</span></a></h3>
+                  <span v-if="entry.pinned" class="pinned-label"><span aria-hidden="true">◆</span> 常用</span>
+                </div>
+                <p class="entry-description">{{ entry.description }}</p>
+                <div class="entry-meta"><span class="entry-type">{{ typeLabels[entry.type] }}</span><span aria-hidden="true" class="meta-divider">·</span><div class="tags"><button v-for="value in entry.tags" :key="value" type="button" :class="['tag', { selected: value === tag }]" :aria-pressed="value === tag" @click="selectTag(value)">{{ value }}</button></div></div>
+              </div>
+              <a v-if="entry.type !== 'command'" :href="entry.href" :target="entry.type === 'bookmark' ? '_blank' : undefined" :rel="entry.type === 'bookmark' ? 'noopener noreferrer' : undefined" class="entry-open" :aria-label="`${entry.type === 'bookmark' ? '打开网址' : '查看'}：${entry.title}`">{{ entry.type === 'bookmark' ? '↗' : '→' }}</a>
             </div>
-            <p class="m-0 max-w-md text-sm leading-6 text-slate-500">
-              当前先建立清晰的分类边界；只有具备实际可访问页面的应用才会显示为已上线工具。
-            </p>
-          </div>
-
-          <div class="grid gap-4 md:grid-cols-2">
-            <article
-              v-for="(category, index) in toolCategories"
-              :id="`category-${category.id}`"
-              :key="category.id"
-              class="category-card group relative overflow-hidden rounded-2xl border border-white/9 bg-[#0d1425]/80 p-6 transition duration-300 hover:-translate-y-1 hover:border-white/18 sm:p-8"
-              :style="{ '--category-accent': category.accent, '--category-soft': category.softAccent }"
-            >
-              <div class="mb-10 flex items-start justify-between">
-                <span class="grid h-12 w-12 place-items-center rounded-xl border border-white/10 bg-white/5 font-mono text-sm font-bold text-white">
-                  {{ category.symbol }}
-                </span>
-                <span class="font-mono text-xs text-slate-600">0{{ index + 1 }}</span>
+            <details v-if="entry.type === 'command' && entry.commands.length" class="command-preview">
+              <summary><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="m6 3 5 5-5 5"/></svg><span class="expand-label">展开命令</span><span class="collapse-label">收起命令</span><span class="command-count">{{ entry.commands.length }} 段</span></summary>
+              <div class="command-snippets">
+                <div v-for="(snippet, index) in entry.commands" :key="index" class="code-block">
+                  <div class="code-toolbar"><span>{{ snippet.language || 'text' }}</span><button type="button" class="copy-button" @click="copyCode($event, entry.id, index, snippet.code)">{{ copyStatus[`${entry.id}:${index}`] === '已复制' ? '已复制 ✓' : '复制' }}<span class="visually-hidden">第 {{ index + 1 }} 段命令</span></button></div>
+                  <pre tabindex="0"><code>{{ snippet.code }}</code></pre>
+                  <p v-if="copyStatus[`${entry.id}:${index}`]" class="copy-status" role="status">{{ copyStatus[`${entry.id}:${index}`] }}</p>
+                </div>
+                <a :href="entry.href" class="command-detail-link">查看完整说明 <span aria-hidden="true">→</span></a>
               </div>
-
-              <h3 class="m-0 text-2xl font-bold text-white">{{ category.name }}</h3>
-              <p class="mt-3 max-w-lg text-sm leading-6 text-slate-400">{{ category.description }}</p>
-
-              <ul class="mt-6 flex list-none flex-wrap gap-2 p-0" :aria-label="`${category.name}包含的典型场景`">
-                <li
-                  v-for="example in category.examples"
-                  :key="example"
-                  class="rounded-full border border-white/8 bg-white/[0.025] px-3 py-1.5 text-xs text-slate-500"
-                >
-                  {{ example }}
-                </li>
-              </ul>
-
-              <div v-if="toolsForCategory(category.id).length" class="mt-7 grid gap-2">
-                <a
-                  v-for="tool in toolsForCategory(category.id)"
-                  :key="tool.id"
-                  :href="tool.path"
-                  class="rounded-xl border border-white/8 px-4 py-3 text-sm font-medium text-white no-underline transition-colors hover:bg-white/5"
-                >
-                  {{ tool.name }}
-                </a>
-              </div>
-              <p v-else class="mb-0 mt-7 border-t border-white/8 pt-5 text-xs font-medium text-slate-600">
-                工具接入中 · 暂无空白详情页
-              </p>
-            </article>
-          </div>
+            </details>
+          </article>
         </div>
-      </section>
-
-      <section id="principles" class="mx-auto max-w-6xl scroll-mt-20 px-5 py-20 sm:px-8 sm:py-24">
-        <div class="grid gap-10 lg:grid-cols-[0.8fr_1.2fr] lg:gap-20">
-          <div>
-            <p class="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-cyan-300">Principles</p>
-            <h2 class="m-0 text-3xl font-bold tracking-tight text-white sm:text-4xl">清楚、独立、可持续</h2>
-            <p class="mt-5 text-sm leading-7 text-slate-500">
-              这个仓库不限定某一种技术或主题，重点是让每个 Web 应用都有明确用途、稳定入口和可理解的使用边界。
-            </p>
-          </div>
-
-          <ol class="m-0 grid list-none gap-3 p-0">
-            <li class="flex gap-5 rounded-2xl border border-white/8 bg-white/[0.018] p-6">
-              <span class="font-mono text-sm text-cyan-300">01</span>
-              <div>
-                <h3 class="m-0 text-base font-semibold text-white">真实可用再上线</h3>
-                <p class="mb-0 mt-2 text-sm leading-6 text-slate-500">不为尚不存在的工具生成可索引详情页，避免失效入口和空洞内容。</p>
-              </div>
-            </li>
-            <li class="flex gap-5 rounded-2xl border border-white/8 bg-white/[0.018] p-6">
-              <span class="font-mono text-sm text-cyan-300">02</span>
-              <div>
-                <h3 class="m-0 text-base font-semibold text-white">每个工具独立表达</h3>
-                <p class="mb-0 mt-2 text-sm leading-6 text-slate-500">上线后拥有独立地址、功能说明、输入输出边界和相关工具导航。</p>
-              </div>
-            </li>
-            <li class="flex gap-5 rounded-2xl border border-white/8 bg-white/[0.018] p-6">
-              <span class="font-mono text-sm text-cyan-300">03</span>
-              <div>
-                <h3 class="m-0 text-base font-semibold text-white">分类服务于使用场景</h3>
-                <p class="mb-0 mt-2 text-sm leading-6 text-slate-500">文件、API、开发和数据只是当前入口，后续可以按真实应用继续扩展。</p>
-              </div>
-            </li>
-          </ol>
+        <div v-else class="empty-state">
+          <svg viewBox="0 0 32 32" fill="none" stroke="currentColor" stroke-width="1.4" aria-hidden="true"><circle cx="13" cy="13" r="8"/><path d="m19 19 8 8M10 13h6"/></svg>
+          <h3>{{ isFiltered ? '没有找到匹配的记录' : '从第一条备忘开始' }}</h3>
+          <p>{{ isFiltered ? '试试更短的关键词，或减少筛选条件。' : '把常用命令、网址和笔记放在这里。' }}</p>
+          <button v-if="isFiltered" type="button" class="primary-button" @click="resetFilters">查看全部记录</button>
+          <a v-else :href="contentUrl" target="_blank" rel="noopener noreferrer" class="primary-button">添加内容</a>
         </div>
+        <p v-if="results.length" class="list-end">{{ isFiltered ? '以上是全部匹配记录' : '常用的，留在手边。' }}</p>
       </section>
-    </main>
-
-    <footer class="relative z-10 border-t border-white/8">
-      <div class="mx-auto flex max-w-6xl flex-col gap-4 px-5 py-8 text-xs text-slate-600 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <p class="m-0">© {{ new Date().getFullYear() }} ZQZYZ Tools</p>
-        <p class="m-0">工具能力与数据处理方式以各应用页面说明为准</p>
-      </div>
-    </footer>
-  </div>
+    </div>
+  </main>
+  <footer class="site-footer"><span>{{ site.title }}</span><span>记录 · 查找 · 使用</span></footer>
 </template>
-
-<style scoped>
-.category-card::before {
-  position: absolute;
-  inset: 0 0 auto;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, var(--category-accent), transparent);
-  content: '';
-  opacity: 0.55;
-}
-
-.category-card::after {
-  position: absolute;
-  top: -5rem;
-  right: -5rem;
-  width: 12rem;
-  height: 12rem;
-  border-radius: 9999px;
-  background: var(--category-soft);
-  filter: blur(36px);
-  content: '';
-  opacity: 0.7;
-  pointer-events: none;
-}
-</style>

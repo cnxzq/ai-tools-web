@@ -6,19 +6,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vue-tsc -b && vite build",
-    "preview": "vite preview"
+    "build": "vue-tsc -b && vite build && node scripts/verify-build.mjs",
+    "preview": "vite preview",
+    "check:content": "node scripts/check-content.mjs",
+    "test": "node --test tests/*.test.mjs src/tools/*.test.mjs"
   },
   "dependencies": {
     "vue": "^3.5.41"
   },
   "devDependencies": {
-    "unocss": "^66.10.1",
     "@types/node": "^24.13.3",
     "@vitejs/plugin-vue": "^6.0.8",
     "@vue/tsconfig": "^0.9.1",
+    "marked": "^18.0.12",
     "typescript": "~6.0.2",
+    "unocss": "^66.10.1",
     "vite": "^8.2.2",
-    "vue-tsc": "^3.3.11"
+    "vue-tsc": "^3.3.11",
+    "yaml": "^2.9.0"
   }
 }
